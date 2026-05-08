@@ -4,6 +4,7 @@ use crate::{
     setup::{prover_key::ProvingKey, verifier_key::VerifyingKey}, srs::powers_of_tau::{ PowersOfTau}
 };
 use ark_ff::Field;
+use ark_ff::Zero;
 use ark_bn254::Fr;
 use ark_std::UniformRand;
 use crate::common::curve::{g1_gen, g2_gen, g1_mul, g2_mul};
@@ -51,8 +52,8 @@ fn phi_factor(u: &Vec<Fr>, v: &Vec<Fr>, w: &Vec<Fr>, alpha: Fr, beta: Fr, tau: F
 fn polynomial_at_tau(polynomial: &Vec<Fr>, tau: Fr) -> Fr {
     let mut result: Fr = Fr::from(0u64);
     let mut power_of_tau = Fr::from(1u64);
-    for i in (0..polynomial.len()).rev() {
-        result = result + polynomial[i] * power_of_tau;
+    for coeff in polynomial {
+        result = result + *coeff * power_of_tau;
         power_of_tau = power_of_tau * tau;
     }
     result
@@ -68,13 +69,23 @@ fn power(base: Fr, exponent: usize) -> Fr {
 
 fn h_srs_computation(qap: &QAP, num_constraints: usize, tau: Fr, sigma: Fr) -> Vec<G1> {
     let t_of_tau = polynomial_at_tau(&qap.t, tau);
-    let mut h_srs_vector: Vec<G1> = Vec::with_capacity(num_constraints - 1);
-    for i in (0..(num_constraints - 1)).rev() {
+    let h_len = num_constraints.saturating_sub(1);
+    let mut h_srs_vector: Vec<G1> = Vec::with_capacity(h_len);
+    for i in 0..h_len {
         let factor = power(tau, i) * t_of_tau * sigma.inverse().unwrap();
         let point = g1_mul(g1_gen(), factor);
         h_srs_vector.push(point);
     }
     h_srs_vector
+}
+
+fn random_non_zero_fr(rng: &mut impl rand::Rng) -> Fr {
+    loop {
+        let x = Fr::rand(rng);
+        if !x.is_zero() {
+            return x;
+        }
+    }
 }
 
 impl Setup {
@@ -83,9 +94,12 @@ impl Setup {
         let alpha = Fr::rand(&mut rng);
         let beta  = Fr::rand(&mut rng);
         let tau   = Fr::rand(&mut rng);
-        let gamma = Fr::rand(&mut rng);
-        let sigma = Fr::rand(&mut rng);
+        let gamma = random_non_zero_fr(&mut rng);
+        let sigma = random_non_zero_fr(&mut rng);
         let powers_of_tau = PowersOfTau::new(num_constraints, tau);
+
+        let phi_public = phi_computation(alpha, beta, gamma, tau, witness_length, qap);
+        let phi_private = phi_computation(alpha, beta, sigma, tau, witness_length, qap);
 
         let proving_key = ProvingKey {
             alpha_g1: g1_mul(g1_gen(), Fr::from(alpha)),
@@ -97,14 +111,14 @@ impl Setup {
             srs_g1: powers_of_tau.powers_g1,
             srs_g2: powers_of_tau.powers_g2,
             h_t_tau: h_srs_computation(qap, num_constraints, tau, sigma),
-            phi_i_g1: phi_computation(alpha, beta, gamma, tau, witness_length, qap)
+            phi_i_g1: phi_private
         };
         let verifying_key = VerifyingKey {
             alpha_g1: g1_mul(g1_gen(), Fr::from(alpha)),
             beta_g2: g2_mul(g2_gen(), Fr::from(beta)),
             gamma_g2: g2_mul(g2_gen(), Fr::from(gamma)),
             sigma_g2: g2_mul(g2_gen(), Fr::from(sigma)),
-            phi_i_g1: phi_computation(alpha, beta, gamma, tau, witness_length, qap)
+            phi_i_g1: phi_public
         };
 
         Self { proving_key, verifying_key }

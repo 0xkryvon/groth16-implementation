@@ -1,11 +1,14 @@
 use ark_bn254::Fr;
-use ark_ff::Zero;
-use crate::{common::curve::{G1, pair}, proof::Proof, setup::verifier_key::VerifyingKey};
+use crate::{common::curve::pair, proof::Proof, setup::verifier_key::VerifyingKey};
 
 pub fn verify(proof: &Proof, verifying_key: &VerifyingKey, public_witness: &Vec<Fr>) -> bool {
-    let mut x_g1 = G1::zero();
+    if public_witness.len() + 1 > verifying_key.phi_i_g1.len() {
+        return false;
+    }
+
+    let mut x_g1 = verifying_key.phi_i_g1[0];
     for j in 0..public_witness.len() {
-        x_g1 = x_g1 + verifying_key.phi_i_g1[j] * public_witness[j]
+        x_g1 = x_g1 + verifying_key.phi_i_g1[j + 1] * public_witness[j]
     }
 
     let left_side = pair(proof.a, proof.b);

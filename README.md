@@ -1,99 +1,109 @@
 # groth16-implementation
 
-A from-scratch educational implementation of the Groth16 zk-SNARK workflow over `BN254` using the `arkworks` ecosystem.
+Educational Groth16 zk-SNARK implementation over BN254 using `arkworks`.
 
-This crate includes:
-- An `R1CS` representation
-- Conversion from `R1CS` to `QAP`
-- A trusted setup that builds proving/verifying keys
-- Prover logic that generates a Groth16 proof
-- Verifier logic based on pairing checks
+This repository implements the full flow:
+- R1CS constraint system
+- R1CS -> QAP transformation
+- Trusted setup (proving + verifying keys)
+- Prover
+- Verifier (pairing equation)
+
+## Current Status
+
+- Core flow is working end-to-end.
+- `cargo test` passes.
+- `cargo run` executes a full Groth16 example for:
+  - `x^4 + 5x^2y^2 = z`
 
 ## Requirements
 
-- Rust toolchain (stable)
+- Rust (stable)
 - Cargo
 
-## Build
+## Quick Start
+
+Build:
 
 ```bash
 cargo build
 ```
 
-## Run tests
+Run tests:
 
 ```bash
 cargo test
 ```
 
-## Project layout
+Run the demo circuit from `main.rs`:
+
+```bash
+cargo run
+```
+
+Expected output:
+
+```text
+Groth16 proof valid: true
+```
+
+## Demo Circuit in `main.rs`
+
+The default executable proves and verifies:
+
+`x^4 + 5x^2y^2 = z`
+
+with example values:
+- `x = 2`
+- `y = 3`
+- `z = 196`
+
+It builds R1CS constraints for intermediate wires (`x^2`, `y^2`, `x^4`, `5x^2y^2`), runs setup, creates a proof, and verifies it.
+
+## Project Structure
 
 ```text
 src/
-  common/      # Curve and field helpers (BN254, pairings, scalar ops)
-  r1cs/        # Constraint representation and dense matrix form
-  qap/         # R1CS -> QAP conversion + interpolation
-  srs/         # Powers of tau
+  common/      # Curve/field utilities and pairing helpers
+  r1cs/        # Constraint representation and dense R1CS matrices
+  qap/         # R1CS -> QAP interpolation and target polynomial
+  srs/         # Powers of tau utilities
   setup/       # Trusted setup, proving key, verifying key
-  prover/      # Proof generation
-  verifier/    # Proof verification
-  proof.rs     # Proof struct (A, B, C)
+  prover/      # Groth16 prover
+  verifier/    # Groth16 verifier
+  proof.rs     # Proof type (A, B, C)
+  main.rs      # End-to-end demo example
+
+tests/
+  common_tests.rs
+  r1cs_tests.rs
+  qap_tests.rs
+  srs_tests.rs
+  setup_tests.rs
+  prover_tests.rs
+  verifier_tests.rs
 ```
 
-## High-level flow
+## Test Components Separately
 
-1. Define constraints as `Constraint` values and build an `R1CS`.
-2. Convert the `R1CS` into a `QAP` using `QAP::from_r1cs`.
-3. Run `Setup::construct_setup` to generate proving and verifying keys.
-4. Call `prove(...)` with a witness to create a `Proof`.
-5. Call `verify(...)` with the proof and public inputs.
+You can run tests per component:
 
-## Minimal library usage example
-
-```rust
-use ark_bn254::Fr;
-use groth16_implementation::{
-    prover::prover::prove,
-    qap::qap::QAP,
-    r1cs::{constraint::Constraint, r1cs::R1CS},
-    setup::trusted_setup::Setup,
-    verifier::verify::verify,
-};
-
-fn demo() {
-    // Example witness convention in this codebase:
-    // witness[0] is commonly the constant 1.
-    // public inputs are expected from witness[1..num_public_inputs].
-    let witness = vec![Fr::from(1u64), Fr::from(3u64), Fr::from(9u64)];
-
-    // Example single constraint (shape only):
-    // (a · w) * (b · w) = (c · w)
-    let constraints = vec![
-        Constraint::new(
-            vec![(1, Fr::from(1u64))], // a
-            vec![(1, Fr::from(1u64))], // b
-            vec![(2, Fr::from(1u64))], // c
-        )
-    ];
-
-    let num_public_inputs = 2; // includes witness[0] convention in this implementation
-    let r1cs = R1CS::new(constraints, witness.len(), num_public_inputs);
-    let qap = QAP::from_r1cs(&r1cs);
-
-    let setup = Setup::construct_setup(&qap, r1cs.num_constraints, r1cs.witness_length);
-    let (proof, public_witness) = prove(&qap, &setup.proving_key, &witness, num_public_inputs);
-    let ok = verify(&proof, &setup.verifying_key, &public_witness);
-
-    assert!(ok);
-}
+```bash
+cargo test --test common_tests
+cargo test --test r1cs_tests
+cargo test --test qap_tests
+cargo test --test srs_tests
+cargo test --test setup_tests
+cargo test --test prover_tests
+cargo test --test verifier_tests
 ```
 
 ## Notes
 
-- This repository is educational and focuses on clarity over production hardening.
-- Trusted setup here is local and randomized for demonstration.
-- Serialization, parameter persistence, and robust test vectors are not yet included.
+- This codebase is educational and not production-hardened.
+- Trusted setup is generated locally for demonstration.
+- No serialization format or persistent parameter storage is included yet.
 
 ## License
 
-MIT (see `LICENSE`).
+MIT. See [LICENSE](LICENSE).
