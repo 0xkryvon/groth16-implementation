@@ -1,0 +1,15 @@
+[package]
+name = "groth16-implementation"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ark-bn254 = "0.4"
+ark-ec = "0.4"
+ark-std = "0.4"
+ark-ff = "0.4"
+ark-poly = "0.4"
+rand = "0.8"
+
+[dev-dependencies]
+ark-std = "0.4"
